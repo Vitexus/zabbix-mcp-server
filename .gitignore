@@ -193,3 +193,10 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 uv.lock
+debian/.debhelper
+debian/files
+debian/debhelper-build-stamp
+debian/zabbix-mcp-server/
+debian/*.substvars
+debian/*.debhelper
+.pybuild/
