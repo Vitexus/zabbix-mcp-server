@@ -1,0 +1,10 @@
+zabbix-mcp-server (1.1.0-1) unstable; urgency=medium
+
+  * Initial Debian package release
+  * Comprehensive MCP server for Zabbix integration
+  * Support for host, item, trigger, template, and user management
+  * Support for problem, event, and maintenance management
+  * Read-only mode support for secure monitoring
+  * Support for both STDIO and HTTP transports
+
+ -- Vítězslav Dvořák <info@vitexsoftware.cz>  Sun, 25 Jan 2026 22:35:02 +0100

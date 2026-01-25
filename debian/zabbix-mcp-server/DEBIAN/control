@@ -1,0 +1,21 @@
+Package: zabbix-mcp-server
+Version: 1.1.0-1
+Architecture: all
+Maintainer: Vítězslav Dvořák <info@vitexsoftware.cz>
+Installed-Size: 116
+Depends: python3-dotenv (>= 1.1.0), python3-fastmcp (>= 2.8.1), python3-zabbix-utils (>= 2.0.3), python3:any
+Section: python
+Priority: optional
+Homepage: https://github.com/mpeirone/zabbix-mcp-server
+Description: Model Context Protocol server for Zabbix integration
+ A comprehensive MCP server providing complete access to Zabbix API
+ functionality through the Model Context Protocol, enabling AI assistants
+ and other tools to interact with Zabbix monitoring systems.
+ .
+ Features include:
+  * Host, item, trigger, template, and user management
+  * Problem, event, and maintenance management
+  * Historical data and trend retrieval
+  * Proxy and host group management
+  * Read-only mode for secure monitoring
+  * Support for both STDIO and HTTP transports

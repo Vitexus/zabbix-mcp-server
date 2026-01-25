@@ -1,0 +1,11 @@
+cd7036394c8195c2649c49ce77998965  usr/bin/zabbix-mcp
+3c8c8c9f163f879ad260c27cd61a76e8  usr/lib/python3/dist-packages/src/__init__.py
+0adacb4a569937deedd29be0d8196d76  usr/lib/python3/dist-packages/src/zabbix_mcp_server.py
+c72246579c4437c07cebb86fbcbc6d90  usr/lib/python3/dist-packages/zabbix_mcp_server-1.1.0.dist-info/INSTALLER
+5a5bb1aea6a468d4b1256c1491606625  usr/lib/python3/dist-packages/zabbix_mcp_server-1.1.0.dist-info/METADATA
+ef2c8f2df39dac373c521c2b1220ef39  usr/lib/python3/dist-packages/zabbix_mcp_server-1.1.0.dist-info/WHEEL
+2176cffdf154f8b11551b600d827529c  usr/lib/python3/dist-packages/zabbix_mcp_server-1.1.0.dist-info/entry_points.txt
+369990b384d3cb76276c5aa5c98725c9  usr/lib/python3/dist-packages/zabbix_mcp_server-1.1.0.dist-info/top_level.txt
+a6037e39b0f9c79eb4fad54e5fe83525  usr/share/doc/zabbix-mcp-server/README.Debian
+c87b78f513a48101b3bc6367587cb3f8  usr/share/doc/zabbix-mcp-server/changelog.Debian.gz
+9f16610627dc6fda158a5f8666cf82e2  usr/share/doc/zabbix-mcp-server/copyright
