@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Zabbix MCP Server
+Comment=MCP server for Zabbix integration
+Exec=zabbix-mcp
+Icon=zabbix-mcp-server
+Categories=System;Network;
+Terminal=true
