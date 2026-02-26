@@ -108,6 +108,39 @@ A comprehensive Model Context Protocol (MCP) server for Zabbix integration using
    uv run python scripts/test_server.py
    ```
 
+### AppImage Distribution
+
+For a portable, self-contained installation without Python dependencies:
+
+1. **Download the AppImage:**
+   Download the latest `Zabbix-MCP-Server-*.AppImage` from the [releases page](https://github.com/mpeirone/zabbix-mcp-server/releases)
+
+2. **Make it executable:**
+   ```bash
+   chmod +x Zabbix-MCP-Server-*.AppImage
+   ```
+
+3. **Configure environment variables:**
+   Create a `.env` file in your working directory with your Zabbix credentials
+
+4. **Run:**
+   ```bash
+   ./Zabbix-MCP-Server-*.AppImage
+   ```
+
+The AppImage includes Python 3.12 and all dependencies. Configuration is loaded from `.env` in the current working directory.
+
+### Building AppImage
+
+To build the AppImage locally:
+
+```bash
+cd appimage
+./build-appimage.sh
+```
+
+The built AppImage will be available in `build/appimage/`.
+
 ## Configuration
 
 ### Required Environment Variables
