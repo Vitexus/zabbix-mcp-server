@@ -20,6 +20,8 @@ RUN useradd -m -u 1000 mcpuser
 # Install dependencies from root (workspace context)
 ENV UV_COMPILE_BYTECODE=1
 ENV PYTHONOPTIMIZE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 RUN uv sync && chown -R mcpuser:mcpuser /app
 
 USER mcpuser
@@ -33,9 +35,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Pre-compile the app code to greatly reduce Python's startup CPU footprint
 RUN python -m compileall -q /app/src/zabbix_mcp_server/ || true
-
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
 
 
 ENV ZABBIX_MCP_TRANSPORT=streamable-http

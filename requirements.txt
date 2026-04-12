@@ -1,3 +1,4 @@
 fastmcp>=v3.2.0
 zabbix_utils>=2.0.4
 python-dotenv>=1.2.2
+bs4>=0.0.2

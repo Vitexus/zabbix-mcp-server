@@ -4,9 +4,8 @@ Zabbix MCP Server
 A comprehensive Model Context Protocol (MCP) server for Zabbix integration.
 """
 
-__version__ = "2.0.0"
 __author__ = "mpeirone"
-__license__ = "MIT"
+__license__ = "GPL-3.0"
 
 from zabbix_mcp_server.server import (
     get_zabbix_client,

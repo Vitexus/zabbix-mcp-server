@@ -4,9 +4,6 @@ Test script for Zabbix MCP Server
 
 This script validates the server configuration and tests basic functionality
 to ensure everything is working correctly with the unified zabbix_api tool.
-
-Author: Zabbix MCP Server Contributors
-License: MIT
 """
 
 import os
@@ -79,7 +76,7 @@ def test_environment() -> bool:
         print("Please set either ZABBIX_TOKEN or both ZABBIX_USER and ZABBIX_PASSWORD")
         return False
 
-    read_only = os.getenv("READ_ONLY", "true").lower() in ("true", "1", "yes")
+    read_only = os.getenv("READ_ONLY", "false").lower() in ("true", "1", "yes")
     print(f"ℹ️  Read-only mode: {'Enabled' if read_only else 'Disabled'}")
 
     verify_ssl = os.getenv("VERIFY_SSL", "true").lower() in ("true", "1", "yes")
@@ -127,7 +124,6 @@ def test_unified_tool() -> bool:
 
     try:
         from zabbix_mcp_server import get_zabbix_client, is_read_operation
-        import json
 
         print(" - Testing is_read_operation function...")
         # Test read operations (should return True)
@@ -235,7 +231,7 @@ def test_read_only_mode() -> bool:
     Returns:
         bool: True if read-only mode works correctly
     """
-    read_only = os.getenv("READ_ONLY", "true").lower() in ("true", "1", "yes")
+    read_only = os.getenv("READ_ONLY", "false").lower() in ("true", "1", "yes")
 
     if not read_only:
         print("\n⏭️  Skipping read-only mode test (not enabled)")
@@ -267,9 +263,6 @@ def test_read_only_mode() -> bool:
                 " ⚠️  Cannot test blocking - read-only not enabled or operation is read"
             )
             return True
-
-        print(" ✅ Write operations would be blocked in read-only mode")
-        return True
 
         print(" ✅ Write operations would be blocked in read-only mode")
         return True

@@ -7,125 +7,116 @@ a single unified tool, enabling AI assistants to interact with Zabbix monitoring
 systems dynamically.
 
 Author: Zabbix MCP Server Contributors
-License: MIT
+License: GPL-3.0-or-later
 """
 
-import os
 import logging
-from typing import Any, Dict, Optional
+import threading
+from typing import Any, Dict, List, Optional
 from fastmcp import FastMCP
+from .api_docs_scraper import scrape_zabbix_api, get_method_docs
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from .config import EnvVars, parse_bool_env, parse_int_env, get_env, setup_logging
 from .client import get_zabbix_client
-from .utils import is_read_only, is_read_operation, format_response
-
-logging.basicConfig(
-    level=logging.INFO if os.getenv("DEBUG") else logging.WARNING,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+from .utils import (
+    is_read_only,
+    is_read_operation,
+    format_response,
+    check_method_allowed,
 )
+
+setup_logging(debug=parse_bool_env(EnvVars.DEBUG))
 logger = logging.getLogger(__name__)
 
+
 mcp = FastMCP("Zabbix MCP Server")
+
+ZABBIX_API_OBJECTS: Dict[str, list[str]] = {}
+_api_objects_lock = threading.Lock()
+
+
+def _discover_api_objects() -> Dict[str, list[str]]:
+    client = get_zabbix_client()
+    objects: Dict[str, list[str]] = {}
+    api_objects = [
+        attr
+        for attr in dir(client)
+        if not attr.startswith("_") and not callable(getattr(client, attr, None))
+    ]
+    for obj_name in api_objects:
+        obj = getattr(client, obj_name, None)
+        if obj is None:
+            continue
+        methods = [
+            m
+            for m in dir(obj)
+            if not m.startswith("_") and callable(getattr(obj, m, None))
+        ]
+        if methods:
+            objects[obj_name] = sorted(methods)
+    return objects
+
+
+def _get_api_objects() -> Dict[str, list[str]]:
+    global ZABBIX_API_OBJECTS
+    if ZABBIX_API_OBJECTS:
+        return ZABBIX_API_OBJECTS
+    with _api_objects_lock:
+        if ZABBIX_API_OBJECTS:
+            return ZABBIX_API_OBJECTS
+        ZABBIX_API_OBJECTS = _discover_api_objects()
+        return ZABBIX_API_OBJECTS
 
 
 @mcp.tool()
 def zabbix_api(method: str, params: Optional[Dict[str, Any]] = None) -> str:
-    """Execute any Zabbix API method dynamically.
+    """Execute Zabbix API method.
 
-    This unified tool provides access to ALL Zabbix API functionality through
-    a single interface. The method parameter follows the format 'object.action'
-    (e.g., 'host.get', 'item.create', 'trigger.update').
+    This is the main tool for interacting with Zabbix. It requires multiple
+    iterations to achieve complex goals. Use other tools for guidance.
 
-    IMPORTANT - Output Parameter Best Practices:
-    For 'get' operations, ALWAYS specify the 'output' parameter explicitly
-    to improve performance and reduce response size.
+    WORKFLOW:
+    1. If unsure about method/params: call zabbix_api_docs(method) first
+    2. If unsure about available methods: call zabbix_api_list() first
+    3. Execute the API call with this tool
+    4. If empty results or errors: iterate with different params/filters
+    5. Continue iterating until goal is achieved
 
-    ✅ RECOMMENDED: Specify only needed fields
-    params={'output': ['hostid', 'name', 'status']}
-
-    ❌ DISCOURAGED: Using 'extend' (returns ALL fields, slow and verbose)
-    params={'output': 'extend'}
-
-    📋 DEFAULT: If 'output' is not specified, defaults to ['name']
-    This provides minimal but useful information for most use cases.
+    COMMON PATTERNS:
+    - Finding an object requires 2+ calls (find ID, then get details)
+    - CPU usage example: Find host by name, get its items, filter CPU item, get history
+    - Empty results often mean wrong filters - try broader search first
 
     Args:
-        method: Zabbix API method in format 'object.action'
-        Examples: 'host.get', 'item.create', 'trigger.update',
-        'problem.get', 'template.create', 'user.get'
-
-        params: Dictionary of parameters for the API method (optional)
-        Examples:
-        {'output': ['hostid', 'name']} - Specific fields (RECOMMENDED)
-        {'output': 'extend'} - All fields (DISCOURAGED, slow)
-        {'hostids': ['10084'], 'output': ['itemid', 'name', 'lastvalue']}
+        method: Zabbix API method (format: 'object.action').
+        Examples: 'host.get', 'item.create', 'trigger.update'
+        params: Method parameters (optional). For 'get' operations,
+        specify 'output' to limit fields (default: ['name']).
 
     Returns:
-        str: JSON formatted response from Zabbix API
+        JSON response from Zabbix API.
 
     Examples:
-    # Get hosts with specific fields (RECOMMENDED)
-    >>> zabbix_api(method='host.get', params={'output': ['hostid', 'name', 'status']})
+    # Simple query
+    zabbix_api('host.get', {'output': ['hostid', 'name']})
 
-    # Get hosts in a specific group with limited fields
-    >>> zabbix_api(method='host.get', params={
-    ... 'groupids': ['1'],
-    ... 'output': ['hostid', 'name']
-    ... })
-
-    # Get items for a host with specific fields (RECOMMENDED)
-    >>> zabbix_api(method='item.get', params={
-    ... 'hostids': ['10084'],
-    ... 'output': ['itemid', 'name', 'lastvalue', 'units']
-    ... })
-
-    # Create a new host
-    >>> zabbix_api(
-    ... method='host.create',
-    ... params={
-    ... 'host': 'server-01',
-    ... 'groups': [{'groupid': '1'}],
-    ... 'interfaces': [{'type': 1, 'main': 1, 'useip': 1, 'ip': '192.168.1.100'}]
-    ... }
-    ... )
-
-    # Get recent problems with specific fields (RECOMMENDED)
-    >>> zabbix_api(method='problem.get', params={
-    ... 'output': ['eventid', 'name', 'severity', 'clock'],
-    ... 'recent': True,
-    ... 'sortfield': 'clock',
-    ... 'sortorder': 'DESC'
-    ... })
-
-    # Get API version (no params needed)
-    >>> zabbix_api(method='apiinfo.version')
-
-    Available Zabbix API Objects:
-    - Host management: host, hostgroup, template
-    - Monitoring: item, trigger, graph, discoveryrule, itemprototype
-    - Data: history, trend, problem, event
-    - Users: user, usergroup, usermacro
-    - Infrastructure: proxy, maintenance
-    - Configuration: configuration, action, alert
-    - Discovery: dhost, dservice, drule, dcheck
-    - And many more - see Zabbix API documentation
-
-    Raises:
-        ValueError: If server is in read-only mode and method is a write operation
-        ValueError: If method format is invalid
-        Exception: If Zabbix API returns an error
-
-    Performance Tips:
-    - Always specify 'output' with only needed fields
-    - Use 'limit' parameter to restrict number of results
-    - Use 'filter' parameter to reduce data transfer
-    - Avoid 'output: extend' for large datasets
+    # Multi-step: Find host, then get items
+    # Step 1: Find host ID
+    hosts = zabbix_api('host.get', {'filter': {'host': 'my-srv-01'}, 'output': ['hostid']})
+    # Step 2: Get CPU items for that host
+    items = zabbix_api('item.get', {'hostids': ['12345'], 'search': {'name': 'CPU'}, 'output': ['itemid', 'name']})
+    # Step 3: Get history for specific item
+    history = zabbix_api('history.get', {'itemids': ['67890'], 'output': 'extend', 'history': 0, 'limit': 10})
 
     Note:
-    For full Zabbix API documentation, visit:
-    https://www.zabbix.com/documentation/current/manual/api/reference
+    - Use zabbix_api_docs() for method documentation
+    - Use zabbix_api_list() for available methods
+    - Iterate multiple times - complex queries need 2-5 API calls
     """
+    check_method_allowed(method)
+
     if is_read_only() and not is_read_operation(method):
         raise ValueError(
             f"Server is in read-only mode - operation '{method}' is not allowed. "
@@ -168,38 +159,114 @@ def zabbix_api(method: str, params: Optional[Dict[str, Any]] = None) -> str:
         raise
 
 
-def get_transport_config() -> Dict[str, Any]:
-    transport = os.getenv("ZABBIX_MCP_TRANSPORT", "stdio").lower()
+@mcp.tool()
+def zabbix_api_docs(
+    method: str, version: Optional[str] = None, timeout: Optional[int] = 10
+) -> str:
+    """Get Zabbix API method documentation.
 
-    if transport not in ["stdio", "streamable-http"]:
+    Call this BEFORE zabbix_api() if you are unsure about method parameters.
+    Shows required/optional parameters with types and descriptions.
+
+    Args:
+        method: Zabbix API method (format: \'object.action\').
+        Examples: \'host.get\', \'item.create\', \'trigger.update\'
+        version: Zabbix version (e.g., \'7.0\', \'6.0\'). If omitted, uses server version.
+        timeout: HTTP timeout in seconds (default: 10).
+
+    Returns:
+        Structured documentation with method description, parameters, and return value.
+
+    Example:
+        zabbix_api_docs(\'host.create\')
+        zabbix_api_docs(\'host.get\', version=\'7.0\')
+
+    Note:
+        - Always call this when in doubt about parameters
+        - Combine with zabbix_api_list() to discover available methods
+    """
+    try:
+        return get_method_docs(method, version, timeout)
+    except Exception as e:
+        logger.error(f"Error fetching docs for {method}: {e}")
+        raise
+
+
+@mcp.tool()
+def zabbix_api_list(object: Optional[str] = None) -> Dict[str, list[str]]:
+    """Get available Zabbix API objects and methods.
+
+    Call this to discover what API methods are available before using zabbix_api().
+    Returns all objects and methods discovered dynamically from Zabbix API.
+
+    Args:
+        object: Specific API object (e.g., 'host', 'item'). If omitted, returns all.
+
+    Returns:
+        Dictionary mapping API objects to their available methods.
+
+    Examples:
+        All objects: zabbix_api_list()
+        Specific object: zabbix_api_list(object='host')
+        # Returns: {"host": ["create", "delete", "get", ...]}
+
+    Note:
+        - Use this to discover available methods
+        - Then use zabbix_api_docs() for detailed parameter info
+        - Finally use zabbix_api() to execute the call
+    """
+    api_objects = scrape_zabbix_api()
+    if object is None:
+        return api_objects
+
+    object_lower = object.lower()
+    if object_lower not in api_objects:
+        available = ", ".join(sorted(api_objects.keys()))
         raise ValueError(
-            f"Invalid ZABBIX_MCP_TRANSPORT: {transport}. "
+            f"Unknown API object: '{object}'. Available objects: {available}"
+        )
+
+    return {object_lower: api_objects[object_lower]}
+
+
+def _validate_transport_type(transport: str) -> None:
+    valid_transports = ["stdio", "streamable-http"]
+    if transport not in valid_transports:
+        raise ValueError(
+            f"Invalid {EnvVars.ZABBIX_MCP_TRANSPORT}: {transport}. "
             f"Must be 'stdio' or 'streamable-http'"
         )
 
-    config = {"transport": transport}
 
-    if transport == "streamable-http":
-        auth_type = os.getenv("AUTH_TYPE", "").lower()
-        if auth_type != "no-auth":
-            raise ValueError(
-                "AUTH_TYPE must be set to 'no-auth' when using streamable-http transport"
-            )
-
-        config.update(
-            {
-                "host": os.getenv("ZABBIX_MCP_HOST", "127.0.0.1"),
-                "port": int(os.getenv("ZABBIX_MCP_PORT", "8000")),
-                "stateless_http": os.getenv(
-                    "ZABBIX_MCP_STATELESS_HTTP", "false"
-                ).lower()
-                in ("true", "1", "yes"),
-            }
+def _validate_http_auth() -> None:
+    auth_type = get_env(EnvVars.AUTH_TYPE, "").lower()
+    if auth_type != "no-auth":
+        raise ValueError(
+            f"{EnvVars.AUTH_TYPE} must be set to 'no-auth' when using streamable-http transport"
         )
 
+
+def _get_http_config() -> Dict[str, Any]:
+    return {
+        "host": get_env(EnvVars.ZABBIX_MCP_HOST, "127.0.0.1"),
+        "port": parse_int_env(EnvVars.ZABBIX_MCP_PORT, 8000),
+        "stateless_http": parse_bool_env(EnvVars.ZABBIX_MCP_STATELESS_HTTP),
+    }
+
+
+def get_transport_config() -> Dict[str, Any]:
+    transport = get_env(EnvVars.ZABBIX_MCP_TRANSPORT, "stdio").lower()
+    _validate_transport_type(transport)
+
+    config: Dict[str, Any] = {"transport": transport}
+
+    if transport == "streamable-http":
+        _validate_http_auth()
+        http_config = _get_http_config()
+        config.update(http_config)
         logger.info(
-            f"HTTP transport configured: {config['host']}:{config['port']}, "
-            f"stateless_http={config['stateless_http']}"
+            f"HTTP transport configured: {http_config['host']}:{http_config['port']}, "
+            f"stateless_http={http_config['stateless_http']}"
         )
 
     return config
@@ -216,7 +283,7 @@ def main():
         return 1
 
     logger.info(f"Read-only mode: {is_read_only()}")
-    logger.info(f"Zabbix URL: {os.getenv('ZABBIX_URL', 'Not configured')}")
+    logger.info(f"Zabbix URL: {get_env(EnvVars.ZABBIX_URL, 'Not configured')}")
 
     try:
         if transport_config["transport"] == "stdio":
