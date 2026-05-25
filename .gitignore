@@ -200,3 +200,4 @@ debian/zabbix-mcp-server/
 debian/*.substvars
 debian/*.debhelper
 .pybuild/
+opencode.json
