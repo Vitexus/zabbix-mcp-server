@@ -26,7 +26,7 @@ def is_read_only() -> bool:
     Returns:
         True if READ_ONLY is enabled, False otherwise.
     """
-    return parse_bool_env(EnvVars.READ_ONLY, default=True)
+    return parse_bool_env(EnvVars.READ_ONLY, default=False)
 
 
 def is_read_operation(method: str) -> bool:
